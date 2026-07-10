@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, BigInteger, DateTime
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -23,4 +23,19 @@ class Resume(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    extracted_text = Column(Text, nullable=True)
+
+    parsing_status = Column(
+        String(20),
+        nullable=False,
+        server_default="pending",
+    )
+
+    parsing_error = Column(Text, nullable=True)
+
+    parsed_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
     )
