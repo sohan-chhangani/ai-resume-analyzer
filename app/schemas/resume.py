@@ -39,3 +39,14 @@ class ResumeTextResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+
+class ResumeSectionsResponse(BaseModel):
+    id: int
+    original_filename: str
+    sections: dict[str, str]
+    detected_section_count: int
+
+    model_config = {
+        "from_attributes": True
+    }

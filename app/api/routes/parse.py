@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.resume import Resume
-from app.schemas.resume import ResumeParseResponse, ResumeTextResponse
+from app.schemas.resume import ResumeParseResponse, ResumeSectionsResponse, ResumeTextResponse
 from app.services.parser_service import ResumeParsingError, parse_resume
+from app.services.section_service import detect_sections
 
 
 router = APIRouter(
@@ -96,4 +97,39 @@ def get_resume_text(
         original_filename=resume.original_filename,
         extracted_text=resume.extracted_text,
         extracted_characters=len(resume.extracted_text),
+    )
+
+
+@router.get(
+    "/{resume_id}/sections",
+    response_model=ResumeSectionsResponse,
+)
+def get_resume_sections(
+    resume_id: int,
+    db: Session = Depends(get_db),
+):
+    resume = db.get(Resume, resume_id)
+
+    if resume is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found.",
+        )
+
+    if (
+        resume.parsing_status != "completed"
+        or not resume.extracted_text
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Resume has not been successfully parsed yet.",
+        )
+
+    sections = detect_sections(resume.extracted_text)
+
+    return ResumeSectionsResponse(
+        id=resume.id,
+        original_filename=resume.original_filename,
+        sections=sections,
+        detected_section_count=len(sections),
     )
