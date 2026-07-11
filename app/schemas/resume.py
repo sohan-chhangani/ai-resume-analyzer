@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -44,9 +44,32 @@ class ResumeTextResponse(BaseModel):
 class ResumeSectionsResponse(BaseModel):
     id: int
     original_filename: str
-    sections: dict[str, str]
+    sections: Dict[str, str]
     detected_section_count: int
 
     model_config = {
         "from_attributes": True
     }
+
+
+class ResumeContactResponse(BaseModel):
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    linkedin: Optional[str] = None
+    github: Optional[str] = None
+
+
+class ResumeStatisticsResponse(BaseModel):
+    character_count: int
+    word_count: int
+    section_count: int
+
+
+class ResumeStructuredResponse(BaseModel):
+    id: int
+    original_filename: str
+    contact: ResumeContactResponse
+    skills: Dict[str, List[str]]
+    certifications: List[str]
+    detected_sections: List[str]
+    statistics: ResumeStatisticsResponse
