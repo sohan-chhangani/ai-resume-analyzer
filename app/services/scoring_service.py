@@ -66,16 +66,19 @@ def score_contact_information(
 
 def score_essential_sections(
     sections: Dict[str, str],
+    structured_data: Dict,
 ) -> Dict:
     """
     Score essential resume sections out of 25 points.
+
+    Certification points are awarded only when at least one real
+    certification was extracted, not merely when a section heading exists.
     """
     weights = {
         "professional_summary": 5,
         "technical_skills": 5,
         "professional_experience": 7,
         "education": 5,
-        "certifications": 3,
     }
 
     score = 0
@@ -93,6 +96,16 @@ def score_essential_sections(
                 f"Consider adding a dedicated "
                 f"{section_name.replace('_', ' ')} section."
             )
+
+    certifications = structured_data.get("certifications", [])
+
+    if certifications:
+        score += 3
+        strengths.append("Certifications section with real entries detected.")
+    else:
+        improvements.append(
+            "Consider adding relevant professional certifications."
+        )
 
     return {
         "score": score,
@@ -236,12 +249,15 @@ def score_education(
 
 def score_certifications_and_projects(
     sections: Dict[str, str],
+    structured_data: Dict,
 ) -> Dict:
     """
     Score certifications and projects out of 5 points.
+
+    Certifications count only when real extracted entries exist.
     """
     has_certifications = bool(
-        sections.get("certifications", "").strip()
+        structured_data.get("certifications", [])
     )
     has_projects = bool(
         sections.get("projects", "").strip()
@@ -360,7 +376,10 @@ def build_resume_score(
         structured_data.get("contact", {})
     )
 
-    sections_result = score_essential_sections(sections)
+    sections_result = score_essential_sections(
+        sections,
+        structured_data,
+    )
 
     skills_result = score_technical_skills(
         structured_data.get("skills", {})
@@ -373,7 +392,10 @@ def build_resume_score(
     education_result = score_education(sections)
 
     certifications_projects_result = (
-        score_certifications_and_projects(sections)
+        score_certifications_and_projects(
+            sections,
+            structured_data,
+        )
     )
 
     quality_result = score_content_quality(text)

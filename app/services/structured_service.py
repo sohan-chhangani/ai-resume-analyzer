@@ -64,28 +64,47 @@ def extract_profile_urls(text: str) -> Dict[str, Optional[str]]:
     return profiles
 
 
-def split_comma_separated_values(value: str) -> List[str]:
+def split_skill_values(value: str) -> List[str]:
     """
-    Split a comma-separated resume field into normalized values.
+    Split resume skill values separated by commas or common bullet symbols.
     """
     return [
         item.strip().rstrip(".")
-        for item in value.split(",")
+        for item in re.split(
+            r"[,\u2022\u25cf\u25aa\u25e6\uf0b7]+",
+            value,
+        )
         if item.strip()
     ]
+
+
+def normalize_skill_category(value: str) -> str:
+    """
+    Normalize a skill category name into a deterministic dictionary key.
+    """
+    return (
+        value.strip()
+        .lower()
+        .replace("&", "and")
+        .replace(" ", "_")
+    )
 
 
 def extract_skill_categories(
     skills_text: Optional[str],
 ) -> Dict[str, List[str]]:
     """
-    Extract skill categories from section content formatted as:
+    Extract skill categories from both supported resume formats.
 
-        Payments:
-        EMV L3, NFC POS
+    Multi-line format:
 
         Programming Languages:
         C, Python, Java
+
+    Inline format:
+
+        Languages: C ? Python ? Bash ? Java
+        Backend: FastAPI ? PostgreSQL ? Docker
     """
     if not skills_text:
         return {}
@@ -100,31 +119,73 @@ def extract_skill_categories(
     current_category = None
 
     for line in lines:
-        if line.endswith(":"):
-            current_category = (
-                line[:-1]
-                .strip()
-                .lower()
-                .replace("&", "and")
-                .replace(" ", "_")
+        if ":" in line:
+            category_name, value = line.split(":", 1)
+
+            current_category = normalize_skill_category(
+                category_name
             )
 
             categories.setdefault(current_category, [])
+
+            if value.strip():
+                categories[current_category].extend(
+                    split_skill_values(value)
+                )
+
             continue
 
         if current_category is not None:
             categories[current_category].extend(
-                split_comma_separated_values(line)
+                split_skill_values(line)
             )
 
-    return categories
+    return {
+        category: skills
+        for category, skills in categories.items()
+        if skills
+    }
+
+
+def is_certification_placeholder(value: str) -> bool:
+    """
+    Return True when certification text is placeholder content rather
+    than an actual certification.
+    """
+    normalized = " ".join(value.lower().split())
+
+    exact_placeholders = {
+        "n/a",
+        "na",
+        "none",
+        "none yet",
+        "coming soon",
+        "to be added",
+        "to be updated",
+    }
+
+    if normalized in exact_placeholders:
+        return True
+
+    placeholder_phrases = (
+        "will be added",
+        "will be updated",
+        "to be completed",
+        "coming soon",
+    )
+
+    return any(
+        phrase in normalized
+        for phrase in placeholder_phrases
+    )
 
 
 def extract_certifications(
     certifications_text: Optional[str],
 ) -> List[str]:
     """
-    Convert certification section content into a normalized list.
+    Convert certification section content into a normalized list while
+    excluding placeholder content.
     """
     if not certifications_text:
         return []
@@ -138,13 +199,25 @@ def extract_certifications(
             continue
 
         cleaned = re.sub(
-            r"^[\u2022\u25cf\u25aa\u25e6\-]\s*",
+            r"^[\u2022\u25cf\u25aa\u25e6\uf0b7\-]\s*",
             "",
             cleaned,
         ).strip()
 
-        if cleaned:
-            certifications.append(cleaned)
+        if not cleaned:
+            continue
+
+        if is_certification_placeholder(cleaned):
+            continue
+
+        if re.fullmatch(
+            r"https?://[^\s]+",
+            cleaned,
+            re.IGNORECASE,
+        ):
+            continue
+
+        certifications.append(cleaned)
 
     return certifications
 

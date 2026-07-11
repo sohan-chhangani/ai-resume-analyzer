@@ -11,7 +11,7 @@ class ResumeParsingError(Exception):
 
 
 BULLET_PATTERN = re.compile(
-    r"^\s*[\u2022\u25cf\u25aa\u25e6]\s*"
+    r"^\s*[\u2022\u25cf\u25aa\u25e6\uf0b7]\s*"
 )
 
 
@@ -99,14 +99,46 @@ def normalize_text(text: str) -> str:
 
 
 def extract_pdf_text(file_path: str) -> str:
+    """
+    Extract visible text and embedded HTTP/HTTPS hyperlinks from a PDF.
+    """
     try:
+        extracted_parts = []
+        embedded_urls = []
+        seen_urls = set()
+
         with fitz.open(file_path) as document:
-            text = "\n".join(
-                page.get_text()
-                for page in document
+            for page in document:
+                page_text = page.get_text()
+
+                if page_text:
+                    extracted_parts.append(page_text)
+
+                for link in page.get_links():
+                    uri = link.get("uri")
+
+                    if not uri:
+                        continue
+
+                    uri = uri.strip()
+
+                    if not uri.lower().startswith(
+                        ("http://", "https://")
+                    ):
+                        continue
+
+                    if uri in seen_urls:
+                        continue
+
+                    seen_urls.add(uri)
+                    embedded_urls.append(uri)
+
+        if embedded_urls:
+            extracted_parts.append(
+                "\n".join(embedded_urls)
             )
 
-        return text
+        return "\n".join(extracted_parts)
 
     except Exception as exc:
         raise ResumeParsingError(

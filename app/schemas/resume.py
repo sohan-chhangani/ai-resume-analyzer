@@ -73,3 +73,24 @@ class ResumeStructuredResponse(BaseModel):
     certifications: List[str]
     detected_sections: List[str]
     statistics: ResumeStatisticsResponse
+
+class ResumeScoreBreakdownResponse(BaseModel):
+    contact_information: int
+    essential_sections: int
+    technical_skills: int
+    professional_experience: int
+    education: int
+    certifications_projects: int
+    content_quality: int
+
+
+class ResumeScoreResponse(BaseModel):
+    id: int
+    original_filename: str
+    score: int
+    max_score: int
+    grade: str
+    breakdown: ResumeScoreBreakdownResponse
+    strengths: List[str]
+    improvements: List[str]
+
