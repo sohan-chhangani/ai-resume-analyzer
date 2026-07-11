@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.resume import Resume
-from app.schemas.resume import ResumeParseResponse
+from app.schemas.resume import ResumeParseResponse, ResumeTextResponse
 from app.services.parser_service import ResumeParsingError, parse_resume
 
 
@@ -50,7 +50,7 @@ def parse_uploaded_resume(
             id=resume.id,
             original_filename=resume.original_filename,
             parsing_status=resume.parsing_status,
-            extracted_text=resume.extracted_text,
+            extracted_characters=len(resume.extracted_text),
             parsing_error=resume.parsing_error,
             parsed_at=resume.parsed_at,
             message="Resume parsed successfully",
@@ -67,3 +67,33 @@ def parse_uploaded_resume(
             status_code=422,
             detail=str(exc),
         )
+
+
+@router.get(
+    "/{resume_id}/text",
+    response_model=ResumeTextResponse,
+)
+def get_resume_text(
+    resume_id: int,
+    db: Session = Depends(get_db),
+):
+    resume = db.get(Resume, resume_id)
+
+    if resume is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found.",
+        )
+
+    if resume.parsing_status != "completed" or not resume.extracted_text:
+        raise HTTPException(
+            status_code=409,
+            detail="Resume has not been successfully parsed yet.",
+        )
+
+    return ResumeTextResponse(
+        id=resume.id,
+        original_filename=resume.original_filename,
+        extracted_text=resume.extracted_text,
+        extracted_characters=len(resume.extracted_text),
+    )
