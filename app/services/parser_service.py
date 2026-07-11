@@ -10,19 +10,92 @@ class ResumeParsingError(Exception):
     pass
 
 
+BULLET_PATTERN = re.compile(
+    r"^\s*[\u2022\u25cf\u25aa\u25e6]\s*"
+)
+
+
+def normalize_bullet(line: str) -> str:
+    """
+    Normalize supported bullet symbols to a canonical bullet marker.
+    """
+    if BULLET_PATTERN.match(line):
+        content = BULLET_PATTERN.sub("", line).strip()
+
+        if content:
+            return f"• {content}"
+
+    return line
+
+
+def repair_hyphenated_line_breaks(text: str) -> str:
+    """
+    Repair words split across PDF line boundaries.
+
+    Examples:
+        closed-\nloop -> closed-loop
+        re-\nquirements -> requirements
+    """
+
+    def replace_match(match):
+        first_part = match.group(1)
+        second_part = match.group(2)
+
+        combined = first_part + second_part
+
+        common_prefixes = {
+            "anti",
+            "auto",
+            "co",
+            "de",
+            "dis",
+            "en",
+            "ex",
+            "in",
+            "inter",
+            "mis",
+            "non",
+            "over",
+            "pre",
+            "pro",
+            "re",
+            "sub",
+            "trans",
+            "un",
+            "under",
+        }
+
+        if first_part.lower() in common_prefixes:
+            return combined
+
+        return f"{first_part}-{second_part}"
+
+    return re.sub(
+        r"\b([A-Za-z]+)-\s*\n\s*([a-z][A-Za-z]*)\b",
+        replace_match,
+        text,
+    )
+
+
 def normalize_text(text: str) -> str:
     """
     Normalize extracted resume text while preserving line structure.
     """
-    lines = []
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = repair_hyphenated_line_breaks(text)
+
+    normalized_lines = []
 
     for line in text.splitlines():
         cleaned_line = re.sub(r"[ \t]+", " ", line).strip()
 
-        if cleaned_line:
-            lines.append(cleaned_line)
+        if not cleaned_line:
+            continue
 
-    return "\n".join(lines)
+        cleaned_line = normalize_bullet(cleaned_line)
+        normalized_lines.append(cleaned_line)
+
+    return "\n".join(normalized_lines)
 
 
 def extract_pdf_text(file_path: str) -> str:
