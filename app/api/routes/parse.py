@@ -7,6 +7,8 @@ from app.core.database import get_db
 from app.models.resume import Resume
 from app.schemas.resume import (
     JobMatchRequest,
+    ResumeFeedbackRequest,
+    ResumeFeedbackResponse,
     ResumeJobMatchResponse,
     ResumeParseResponse,
     ResumeScoreResponse,
@@ -14,6 +16,7 @@ from app.schemas.resume import (
     ResumeStructuredResponse,
     ResumeTextResponse,
 )
+from app.services.feedback_service import build_resume_feedback
 from app.services.matching_service import build_job_match
 from app.services.parser_service import ResumeParsingError, parse_resume
 from app.services.scoring_service import build_resume_score
@@ -228,6 +231,67 @@ def get_resume_score(
         **score_data,
     )
 
+
+@router.post(
+    "/{resume_id}/feedback",
+    response_model=ResumeFeedbackResponse,
+)
+def get_resume_feedback(
+    resume_id: int,
+    request: ResumeFeedbackRequest,
+    db: Session = Depends(get_db),
+):
+    resume = db.get(Resume, resume_id)
+
+    if resume is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found.",
+        )
+
+    if (
+        resume.parsing_status != "completed"
+        or not resume.extracted_text
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Resume has not been successfully parsed yet.",
+        )
+
+    sections = detect_sections(resume.extracted_text)
+
+    structured_data = build_structured_resume(
+        resume.extracted_text,
+        sections,
+    )
+
+    score_data = build_resume_score(
+        resume.extracted_text,
+        sections,
+        structured_data,
+    )
+
+    match_data = None
+
+    if (
+        request.job_description
+        and request.job_description.strip()
+    ):
+        match_data = build_job_match(
+            structured_data,
+            request.job_description,
+        )
+
+    feedback_data = build_resume_feedback(
+        score_data,
+        match_data,
+    )
+
+    return ResumeFeedbackResponse(
+        id=resume.id,
+        original_filename=resume.original_filename,
+        **feedback_data,
+    )
 
 @router.post(
     "/{resume_id}/match",

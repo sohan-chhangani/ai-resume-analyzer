@@ -114,3 +114,20 @@ class ResumeJobMatchResponse(BaseModel):
     resume_skills: List[str]
     job_description_skills: List[str]
     keyword_coverage: KeywordCoverageResponse
+
+
+class ResumeFeedbackRequest(BaseModel):
+    job_description: Optional[str] = None
+
+
+class ResumeFeedbackResponse(BaseModel):
+    id: int
+    original_filename: str
+    summary: str
+    resume_score: int
+    resume_grade: str
+    job_match_score: Optional[int] = None
+    priority_improvements: List[str]
+    matched_strengths: List[str]
+    resume_strengths: List[str]
+    resume_improvements: List[str]

@@ -659,3 +659,137 @@ class TestResumeJobMatchEndpoint:
             "matched": 0,
             "required": 0,
         }
+
+class TestResumeFeedbackEndpoint:
+    def test_feedback_with_job_description(self):
+        create_resume(
+            resume_id=201,
+            parsing_status="completed",
+            extracted_text=COMPLETE_RESUME_TEXT,
+        )
+
+        response = client.post(
+            "/resumes/201/feedback",
+            json={
+                "job_description": (
+                    "We need a Python backend engineer with "
+                    "FastAPI, PostgreSQL, Docker, Redis, "
+                    "AWS, REST APIs, Git and Linux."
+                )
+            },
+        )
+
+        assert response.status_code == 200
+
+        data = response.json()
+
+        assert data["id"] == 201
+        assert data["original_filename"] == "resume_201.pdf"
+        assert isinstance(data["resume_score"], int)
+        assert 0 <= data["resume_score"] <= 100
+        assert data["resume_grade"] in {"A", "B", "C", "D", "F"}
+
+        assert isinstance(data["job_match_score"], int)
+        assert 0 <= data["job_match_score"] <= 100
+
+        assert "recognized job-description skills" in data["summary"]
+
+        assert isinstance(data["priority_improvements"], list)
+        assert isinstance(data["matched_strengths"], list)
+        assert isinstance(data["resume_strengths"], list)
+        assert isinstance(data["resume_improvements"], list)
+
+        assert any(
+            "AWS" in improvement
+            for improvement in data["priority_improvements"]
+        )
+
+
+    def test_feedback_without_job_description(self):
+        create_resume(
+            resume_id=202,
+            parsing_status="completed",
+            extracted_text=COMPLETE_RESUME_TEXT,
+        )
+
+        response = client.post(
+            "/resumes/202/feedback",
+            json={},
+        )
+
+        assert response.status_code == 200
+
+        data = response.json()
+
+        assert data["id"] == 202
+        assert data["job_match_score"] is None
+        assert data["priority_improvements"] == []
+        assert data["matched_strengths"] == []
+
+        assert data["summary"] == (
+            "Resume feedback generated without a job description."
+        )
+
+
+    def test_feedback_with_whitespace_job_description(self):
+        create_resume(
+            resume_id=203,
+            parsing_status="completed",
+            extracted_text=COMPLETE_RESUME_TEXT,
+        )
+
+        response = client.post(
+            "/resumes/203/feedback",
+            json={
+                "job_description": "   \n\t   ",
+            },
+        )
+
+        assert response.status_code == 200
+
+        data = response.json()
+
+        assert data["job_match_score"] is None
+        assert data["priority_improvements"] == []
+        assert data["matched_strengths"] == []
+
+        assert data["summary"] == (
+            "Resume feedback generated without a job description."
+        )
+
+
+    def test_feedback_resume_not_found(self):
+        response = client.post(
+            "/resumes/999999/feedback",
+            json={
+                "job_description": "Python FastAPI Docker",
+            },
+        )
+
+        assert response.status_code == 404
+
+        assert response.json() == {
+            "detail": "Resume not found.",
+        }
+
+
+    def test_feedback_unparsed_resume(self):
+        create_resume(
+            resume_id=204,
+            parsing_status="pending",
+        )
+
+        response = client.post(
+            "/resumes/204/feedback",
+            json={
+                "job_description": "Python FastAPI Docker",
+            },
+        )
+
+        assert response.status_code == 409
+
+        assert response.json() == {
+            "detail": (
+                "Resume has not been successfully parsed yet."
+            ),
+        }
