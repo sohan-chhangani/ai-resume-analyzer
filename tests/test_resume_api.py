@@ -563,3 +563,99 @@ class TestResumeLifecycle:
 
         assert 0 <= score_data["score"] <= 100
         assert score_data["max_score"] == 100
+
+
+class TestResumeJobMatchEndpoint:
+    def test_match_resume_success(self):
+        create_resume(
+            resume_id=101,
+            parsing_status="completed",
+            extracted_text=COMPLETE_RESUME_TEXT,
+        )
+
+        response = client.post(
+            "/resumes/101/match",
+            json={
+                "job_description": (
+                    "We need a Python backend engineer with "
+                    "FastAPI, PostgreSQL, Docker, Redis, "
+                    "AWS, REST APIs, Git and Linux."
+                )
+            },
+        )
+
+        assert response.status_code == 200
+
+        data = response.json()
+
+        assert data["id"] == 101
+        assert data["original_filename"] == "resume_101.pdf"
+        assert isinstance(data["match_score"], int)
+        assert 0 <= data["match_score"] <= 100
+        assert "Python" in data["matched_skills"]
+        assert "FastAPI" in data["matched_skills"]
+        assert "AWS" in data["missing_skills"]
+        assert data["keyword_coverage"]["required"] > 0
+
+
+    def test_match_resume_not_found(self):
+        response = client.post(
+            "/resumes/99999/match",
+            json={
+                "job_description": (
+                    "Python FastAPI PostgreSQL Docker"
+                )
+            },
+        )
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Resume not found."
+
+
+    def test_match_resume_unparsed(self):
+        create_resume(
+            resume_id=102,
+            parsing_status="pending",
+        )
+
+        response = client.post(
+            "/resumes/102/match",
+            json={
+                "job_description": (
+                    "Python FastAPI PostgreSQL Docker"
+                )
+            },
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == (
+            "Resume has not been successfully parsed yet."
+        )
+
+
+    def test_match_resume_empty_job_description(self):
+        create_resume(
+            resume_id=103,
+            parsing_status="completed",
+            extracted_text=COMPLETE_RESUME_TEXT,
+        )
+
+        response = client.post(
+            "/resumes/103/match",
+            json={
+                "job_description": ""
+            },
+        )
+
+        assert response.status_code == 200
+
+        data = response.json()
+
+        assert data["match_score"] == 0
+        assert data["matched_skills"] == []
+        assert data["missing_skills"] == []
+        assert data["job_description_skills"] == []
+        assert data["keyword_coverage"] == {
+            "matched": 0,
+            "required": 0,
+        }

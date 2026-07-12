@@ -94,3 +94,23 @@ class ResumeScoreResponse(BaseModel):
     strengths: List[str]
     improvements: List[str]
 
+
+
+class JobMatchRequest(BaseModel):
+    job_description: str
+
+
+class KeywordCoverageResponse(BaseModel):
+    matched: int
+    required: int
+
+
+class ResumeJobMatchResponse(BaseModel):
+    id: int
+    original_filename: str
+    match_score: int
+    matched_skills: List[str]
+    missing_skills: List[str]
+    resume_skills: List[str]
+    job_description_skills: List[str]
+    keyword_coverage: KeywordCoverageResponse

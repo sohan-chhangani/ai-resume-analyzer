@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.resume import Resume
 from app.schemas.resume import (
+    JobMatchRequest,
+    ResumeJobMatchResponse,
     ResumeParseResponse,
     ResumeScoreResponse,
     ResumeSectionsResponse,
     ResumeStructuredResponse,
     ResumeTextResponse,
 )
+from app.services.matching_service import build_job_match
 from app.services.parser_service import ResumeParsingError, parse_resume
 from app.services.scoring_service import build_resume_score
 from app.services.section_service import detect_sections
@@ -223,5 +226,50 @@ def get_resume_score(
         id=resume.id,
         original_filename=resume.original_filename,
         **score_data,
+    )
+
+
+@router.post(
+    "/{resume_id}/match",
+    response_model=ResumeJobMatchResponse,
+)
+def match_resume_to_job(
+    resume_id: int,
+    request: JobMatchRequest,
+    db: Session = Depends(get_db),
+):
+    resume = db.get(Resume, resume_id)
+
+    if resume is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found.",
+        )
+
+    if (
+        resume.parsing_status != "completed"
+        or not resume.extracted_text
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Resume has not been successfully parsed yet.",
+        )
+
+    sections = detect_sections(resume.extracted_text)
+
+    structured_data = build_structured_resume(
+        resume.extracted_text,
+        sections,
+    )
+
+    match_data = build_job_match(
+        structured_data,
+        request.job_description,
+    )
+
+    return ResumeJobMatchResponse(
+        id=resume.id,
+        original_filename=resume.original_filename,
+        **match_data,
     )
 
