@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from app.api.routes.parse import router as parse_router
 from app.api.routes.upload import router as upload_router
+from app.core.config import settings
 from app.core.database import engine
 
 
@@ -14,6 +15,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        settings.FRONTEND_URL,
     ],
     allow_credentials=True,
     allow_methods=["*"],

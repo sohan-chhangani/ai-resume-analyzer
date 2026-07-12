@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = "uploads"
 
+    FRONTEND_URL: str = "http://localhost:3000"
+
     ALLOWED_EXTENSIONS: Set[str] = {
         ".pdf",
         ".docx",
